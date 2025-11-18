@@ -1,106 +1,144 @@
+using System.Collections;
 using System.Collections.Generic;
-using Base;
 using UnityEngine;
 using UnityEngine.Events;
 
-namespace EventCenter
+/// <summary>
+/// 用于 里式替换原则 装载 子类的父类
+/// </summary>
+public abstract class EventInfoBase{ }
+
+/// <summary>
+/// 用来包裹 对应观察者 函数委托的 类
+/// </summary>
+/// <typeparam name="T"></typeparam>
+public class EventInfo<T>:EventInfoBase
 {
-    public abstract class EventInfoBase{}
+    //真正观察者 对应的 函数信息 记录在其中
+    public UnityAction<T> actions;
 
-    public class EventInfo<T> : EventInfoBase
+    public EventInfo(UnityAction<T> action)
     {
-        public UnityAction<T> Actions;
-
-        public EventInfo(UnityAction<T> action)
-        {
-            Actions += action;
-        }
+        actions += action;
     }
-    
-    public class EventInfo: EventInfoBase
-    {
-        public UnityAction Actions;
+}
+
+/// <summary>
+/// 主要用来记录无参无返回值委托
+/// </summary>
+public class EventInfo: EventInfoBase
+{
+    public UnityAction actions;
      
-        public EventInfo(UnityAction action)
+    public EventInfo(UnityAction action)
+    {
+        actions += action;
+    }
+}
+
+
+/// <summary>
+/// 事件中心模块 
+/// </summary>
+public class EventCenter: BaseManager<EventCenter>
+{
+    //用于记录对应事件 关联的 对应的逻辑
+    private Dictionary<E_EventType, EventInfoBase> eventDic = new Dictionary<E_EventType, EventInfoBase>();
+
+    private EventCenter() { }
+
+    /// <summary>
+    /// 触发事件 
+    /// </summary>
+    /// <param name="eventName">事件名字</param>
+    public void EventTrigger<T>(E_EventType eventName, T info)
+    {
+        //存在关心我的人 才通知别人去处理逻辑
+        if(eventDic.ContainsKey(eventName))
         {
-            Actions += action;
+            //去执行对应的逻辑
+            (eventDic[eventName] as EventInfo<T>).actions?.Invoke(info);
         }
     }
-    public class EventCenter : WithoutMono<EventCenter>
-    {
-        //用字典记录函数（委托）
-        private Dictionary<string,EventInfoBase> _eventDic = new Dictionary<string, EventInfoBase>();
-        //私有构造函数，避免在外部被实例化
-        private EventCenter()
-        {
-            
-        } 
-        //将事件存入字典的方法
-        public void DOAddListener(string eventName, UnityAction func)
-        {
-            if(_eventDic.ContainsKey(eventName))
-                (_eventDic[eventName] as EventInfo).Actions += func;
-            else
-            {
-                _eventDic.Add(eventName, new EventInfo(func));
-            }
-        }
 
-        public void DOAddListener<T>(string eventName, UnityAction<T> func)
+    /// <summary>
+    /// 触发事件 无参数
+    /// </summary>
+    /// <param name="eventName"></param>
+    public void EventTrigger(E_EventType eventName)
+    {
+        //存在关心我的人 才通知别人去处理逻辑
+        if (eventDic.ContainsKey(eventName))
         {
-            if (_eventDic.ContainsKey(eventName))
-            {
-                (_eventDic[eventName] as EventInfo<T>).Actions += func;
-            }
-            else
-            {
-                _eventDic.Add(eventName,new EventInfo<T>(func));
-            }
+            //去执行对应的逻辑
+            (eventDic[eventName] as EventInfo).actions?.Invoke();
         }
-        //使用字典里的事件
-        public void DOEventTrigger(string eventName)
+    }
+
+
+    /// <summary>
+    /// 添加事件监听者
+    /// </summary>
+    /// <param name="eventName"></param>
+    /// <param name="func"></param>
+    公共 void AddEventListener<T>(E_EventType eventName, UnityAction<T> func)
+    {
+        //如果已经存在关心事件的委托记录 直接添加即可
+        if (eventDic.ContainsKey(eventName))
         {
-            if (_eventDic.ContainsKey(eventName))
-            {
-                (_eventDic[eventName] as EventInfo).Actions?.Invoke();
-            }
+            (eventDic[eventName] as EventInfo<T>).actions += func;
         }
-        
-        public void DOEventTrigger<T>(string eventName,T func)
+        else
         {
-            if (_eventDic.ContainsKey(eventName))
-            {
-                (_eventDic[eventName] as EventInfo<T>).Actions?.Invoke(func);
-            }
+            eventDic.Add(eventName, new EventInfo<T>(func));
         }
-        //移除字典里事件的方法
-        public void DORemoveListener(string eventName, UnityAction func)
+    }
+
+    public void AddEventListener(E_EventType eventName, UnityAction func)
+    {
+        //如果已经存在关心事件的委托记录 直接添加即可
+        if (eventDic.ContainsKey(eventName))
         {
-            if (_eventDic.ContainsKey(eventName))
-            {
-                (_eventDic[eventName] as EventInfo).Actions -= func;
-            }
+            (eventDic[eventName] as EventInfo).actions += func;
         }
-        
-        public void DORemoveListener<T>(string eventName, UnityAction<T> func)
+        else
         {
-            if (_eventDic.ContainsKey(eventName))
-            {
-                (_eventDic[eventName] as EventInfo<T>).Actions -= func;
-            }
+            eventDic.Add(eventName, new EventInfo(func));
         }
-        //移除字典里所有事件
-        public void DOClear()
-        {
-            _eventDic.Clear();
-        }
-        //移除字典里指定名字的事件
-        public void DOClear(string eventName)
-        {
-            if (_eventDic.ContainsKey(eventName))
-            {
-                _eventDic.Remove(eventName);
-            }
-        }
+    }
+
+    /// <summary>
+    /// 移除事件监听者
+    /// </summary>
+    /// <param name="eventName"></param>
+    /// <param name="func"></param>
+    public void RemoveEventListener<T>(E_EventType eventName, UnityAction<T> func)
+    {
+        if (eventDic.ContainsKey(eventName))
+            (eventDic[eventName] as EventInfo<T>).actions -= func;
+    }
+
+    公共 void RemoveEventListener(E_EventType eventName, UnityAction func)
+    {
+        if (eventDic.ContainsKey(eventName))
+            (eventDic[eventName] as EventInfo).actions -= func;
+    }
+
+    /// <summary>
+    /// 清空所有事件的监听
+    /// </summary>
+    public void Clear()
+    {
+        eventDic.Clear();
+    }
+
+    /// <summary>
+    /// 清除指定某一个事件的所有监听
+    /// </summary>
+    /// <param name="eventName"></param>
+    public void Claer(E_EventType eventName)
+    {
+        if (eventDic.ContainsKey(eventName))
+            eventDic.Remove(eventName);
     }
 }
